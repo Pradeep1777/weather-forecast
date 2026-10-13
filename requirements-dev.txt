@@ -1,0 +1,13 @@
+# Extra tools for development (notebooks, experiment tracking). Not needed to run the app or Docker.
+-r requirements.txt
+ipykernel==7.4.0
+nbclient==0.11.0
+# Tests (python -m pytest)
+pytest==9.1.1
+# Experiment tracking for src/train.py (Lesson M1).
+# On laptops where Windows Application Control blocks SQLAlchemy's compiled DLL ("_util_cy"),
+# reinstall it as pure Python afterwards:
+#   set DISABLE_SQLALCHEMY_CEXT=1   (PowerShell: $env:DISABLE_SQLALCHEMY_CEXT=1)
+#   pip install --force-reinstall --no-deps --no-binary sqlalchemy sqlalchemy==2.1.4
+mlflow==3.17.0
+sqlalchemy==2.1.4

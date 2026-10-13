@@ -1,0 +1,40 @@
+{
+  "model": "HistGradientBoostingRegressor",
+  "experiment": "exp_002_iter600",
+  "description": "Same as exp_001 but with more boosting rounds (best validation result in the M2 experiments)",
+  "settings": {
+    "max_iter": 600,
+    "learning_rate": 0.1,
+    "random_state": 42
+  },
+  "features": [
+    "temp_now",
+    "temp_3h_ago",
+    "temp_avg_24h",
+    "sunlight",
+    "rain",
+    "hour"
+  ],
+  "target": "temperature 1 hour ahead (C)",
+  "area": "South_Mumbai",
+  "trained_on": "1980-01-01 to 2023-12-31",
+  "validation_2022_2023": {
+    "rows": 17520,
+    "model_rmse": 0.3962,
+    "model_mae": 0.2842,
+    "lazy_guess_rmse": 0.8529,
+    "lazy_guess_mae": 0.5773,
+    "improvement_pct": 53.6
+  },
+  "test_2024_2025": {
+    "rows": 17543,
+    "model_rmse": 0.4097,
+    "model_mae": 0.2948,
+    "lazy_guess_rmse": 0.8502,
+    "lazy_guess_mae": 0.5673,
+    "improvement_pct": 51.8
+  },
+  "beats_baseline": true,
+  "sklearn_version": "1.6.1",
+  "created_at": "2026-10-13T13:15:38+00:00"
+}

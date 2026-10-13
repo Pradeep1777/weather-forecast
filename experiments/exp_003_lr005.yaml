@@ -1,0 +1,6 @@
+name: exp_003_lr005
+description:  Same as exp_002 but learning rate 0.05
+model:
+  max_iter: 600
+  learning_rate: 0.05
+  random_state: 42

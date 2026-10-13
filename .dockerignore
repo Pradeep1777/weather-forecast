@@ -1,0 +1,14 @@
+# Keep the image small and secret-free: only what the Dockerfile COPYs is needed
+.env
+.git
+.venv
+**/__pycache__
+**/*.pyc
+*.egg-info
+build
+data/*.csv
+data/raw_areas
+docs
+notebooks
+reports
+tools

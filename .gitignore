@@ -1,0 +1,41 @@
+# Virtual environment
+.venv/
+
+# Secrets (API keys, passwords)
+.env
+
+# Data: too big for git, recreate with download_weather.py ...
+data/*
+# ... except the small RAG files (0.9 MB), so the knowledge base loads without Gemini calls
+!data/chunks.json
+!data/chunk_embeddings.npy
+
+# Models: recreate with src/train.py, except the 1 MB model the agent uses
+models/*
+!models/gb_simple_h1.joblib
+
+# 22.5 MB: src/build_kb.py --rebuild downloads it from IMD when it is missing
+docs/reference/forecasting_sop.pdf
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Full notebooks with all explanations: local only (notebooks/ has the clean, headings-only versions)
+docs/notebooks/
+notebooks/*_explained.ipynb
+
+# Python packaging (pip install -e .)
+*.egg-info/
+build/
+
+# MLflow logbook: personal experiment runs, stay on this PC
+mlflow.db
+mlruns/
+mlartifacts/
+
+# Company-template slide decks: local only
+presentation/*.pptx

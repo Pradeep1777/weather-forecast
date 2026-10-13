@@ -1,0 +1,32 @@
+# CI (MLOps step F2): on every push and pull request, install the pinned packages and run the tests.
+# The tests check every experiment YAML, the config checks and the quality gate, without data, Gemini or a database.
+# Training in CI comes later (F4): the training data is git-ignored, so CI has no data yet.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:        # "Run workflow" button on the Actions tab
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"     # same as the Dockerfile
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest==9.1.1
+
+      - name: Run tests
+        run: python -m pytest -v

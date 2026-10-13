@@ -1,0 +1,27 @@
+# Makes the code in src/ an installable package, so `import agent`, `import rag`, `import tools`
+# work from anywhere (notebooks, tests, Docker) without sys.path tricks.
+#
+#   pip install -e . --config-settings editable_mode=compat
+#
+# "-e" = editable: changes in src/ are used immediately, no reinstall needed.
+# "compat" mode lets VS Code's code checker (Pylance) find the packages too.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weather-intelligence-assistant"
+version = "0.3.0"
+description = "Mumbai weather assistant: ML forecast, RAG over IMD documents, and a tool-using agent"
+requires-python = ">=3.12"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["agent", "rag", "tools"]
+py-modules = ["app"]
+
+[tool.pytest.ini_options]
+# tests import the code in src/ (train.py, data.py) directly
+pythonpath = ["src"]
+testpaths = ["tests"]

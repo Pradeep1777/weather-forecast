@@ -1,0 +1,7 @@
+# One file = one training iteration. Do not edit a file after it has run: copy it to a new number instead.
+name: exp_001_baseline
+description: Starting settings (the original defaults)
+model:
+  max_iter: 300
+  learning_rate: 0.1
+  random_state: 42

@@ -1,0 +1,6 @@
+name: exp_002_iter600
+description: Same as exp_001 but with more boosting rounds (best validation result in the M2 experiments)
+model:
+  max_iter: 600
+  learning_rate: 0.1
+  random_state: 42

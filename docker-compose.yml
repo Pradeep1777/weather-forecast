@@ -1,0 +1,51 @@
+# The whole project: PostgreSQL 17 + pgvector (db) and the assistant API (api).
+# Settings come from .env (copy .env.example and fill in GEMINI_API_KEY and POSTGRES_PASSWORD).
+#
+#   docker compose up -d --build   build and start everything (the API loads the knowledge base itself)
+#   docker compose ps              both should be "healthy"
+#   docker compose logs -f api     watch the API
+#   docker compose down            stop (the data stays in the volume)
+#   docker compose up -d db        only the database (for running the code with the local .venv)
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: weather-pgvector
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # 127.0.0.1 = only this laptop can connect (not other computers on the network).
+      # Laptop port 5434 -> container port 5432 (5433 is used by the Todo app).
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - weather_pgdata:/var/lib/postgresql/data   # keeps the data when the container restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: weather-api
+    env_file: .env                     # GEMINI_API_KEY and the POSTGRES_* settings
+    environment:
+      # inside Docker the app reaches the database by its service name, on the normal port
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy     # wait until Postgres accepts connections
+    ports:
+      - "127.0.0.1:${API_PORT:-8001}:8000"   # http://localhost:8001/docs
+    volumes:
+      # read-only: lets the backtest tool use data/mumbai_clean.csv when it exists on this machine
+      # (the chunks + embeddings in data/ are the same files the image already contains)
+      - ./data:/app/data:ro
+    restart: unless-stopped
+
+volumes:
+  weather_pgdata:
