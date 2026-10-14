@@ -4,6 +4,8 @@ ipykernel==7.4.0
 nbclient==0.11.0
 # Tests (python -m pytest)
 pytest==9.1.1
+# Code checks (ruff check .)
+ruff==0.17.0
 # Experiment tracking for src/train.py (Lesson M1).
 # On laptops where Windows Application Control blocks SQLAlchemy's compiled DLL ("_util_cy"),
 # reinstall it as pure Python afterwards:

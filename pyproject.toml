@@ -25,3 +25,12 @@ py-modules = ["app"]
 # tests import the code in src/ (train.py, data.py) directly
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["notebooks"]   # lesson notebooks, not app code
+
+[tool.ruff.lint]
+# start with the rules that catch real mistakes: pyflakes (F: unused/undefined names, bad imports) + pycodestyle errors (E)
+select = ["E", "F"]
+ignore = ["E501"]   # long lines are this project's style

@@ -45,7 +45,8 @@ flowchart TD
     MLF --- S3[("S3<br/>models and artifacts")]
     MLF --- RDS[("Postgres (RDS)<br/>run history")]
     S3D[("S3<br/>training data")] --> T2
-    T3 -->|champion changed| DEP["Build image -> ECR -> deploy to ECS"]
+    T1 -->|app code changed: API, agent, RAG| DEP["Build image -> ECR -> deploy whole app to ECS"]
+    T3 -->|new champion model| DEP
     YOU["You: open MLflow UI, compare runs"] --> MLF
 ```
 
@@ -115,7 +116,7 @@ sequenceDiagram
     GH->>ML: read champion metrics (gate)
     alt passes gate
         GH->>ML: register model, set alias champion
-        GH->>GH: build and push Docker image (Phase 5)
+        GH->>GH: new champion: redeploy the app (Phase 5)
     else fails gate
         GH-->>Dev: job passes but model not promoted (or fails, your choice)
     end
@@ -130,6 +131,34 @@ Important choices:
 - Training takes about 20-30 s per run today, so it fits easily in a normal CI job.
 
 ## 6. AWS target architecture
+
+**Scope: the whole application goes to AWS, not only the ML model.** That means the FastAPI `/ask` API, the
+LangGraph agent and its 4 tools, the RAG knowledge base (pgvector), the trained model, MLflow, secrets and logs.
+The CD pipeline therefore deploys on **two triggers**: any change to the app code (API, agent, RAG, tools,
+Dockerfile) once tests pass, and a new champion model from training. A change to the documents or chunking also
+reloads the knowledge base in RDS (`build_kb.py`) as a pipeline step.
+
+| Part of the app | Today (local) | On AWS |
+|---|---|---|
+| `/ask` API + agent + tools | `docker compose` app container | ECS Fargate service behind an ALB |
+| RAG knowledge base | Postgres + pgvector container | RDS PostgreSQL with `pgvector`, loaded by `build_kb.py` |
+| Trained model | `models/gb_simple_h1.joblib` in the image | Champion from the MLflow registry (S3) |
+| Experiment tracking | `mlflow.db` on the laptop | MLflow server on ECS + RDS + S3 |
+| Training data | `data/` on disk | S3 bucket (versioned) |
+| Secrets (Gemini key, DB password) | `.env` | Secrets Manager |
+| Logs | terminal | CloudWatch Logs |
+| Chat client (`chat.py`) | terminal on the laptop | stays a client: points at the public `/ask` URL |
+
+**The agent on AWS (it runs inside the API container, not as a separate service).** What each part needs:
+
+| Agent part | Needs on AWS |
+|---|---|
+| Gemini (the agent's "brain") | Gemini API key from Secrets Manager; outbound internet from the task (public subnet or NAT gateway) |
+| `get_live_weather` | Outbound internet to Open-Meteo |
+| `predict_next_hour_temperature` | The champion model (loaded at start) + Open-Meteo |
+| `backtest_temperature` | The ERA5 history `data/mumbai_clean.csv`: today docker compose mounts it from the laptop; on AWS it must come from S3 (or this tool answers "history not available") |
+| `search_imd_documents` | Network access to RDS (security group), knowledge base loaded with `build_kb.py` |
+| Conversation memory | None on the server: the client sends the history with each request (as `chat.py` does) |
 
 ```mermaid
 flowchart TB
@@ -174,7 +203,7 @@ flowchart LR
 | **F2. CI on push** | `.github/workflows/train.yml`: install, pytest, train. At first logs to a CI-local MLflow and uploads `metrics.json` as a CI artifact (no AWS yet) | GitHub Actions basics, secrets, caching pip | A push runs the job; red/green status matches the gate |
 | **F3. Remote MLflow + S3 artifacts** | MLflow server (first on one EC2/Fargate task, SQLite replaced by Postgres), S3 artifact bucket, CI logs to it | S3 basics, IAM roles, MLflow tracking server docs | A push from GitHub makes a run appear in the shared MLflow UI |
 | **F4. Data in S3** | Upload the cleaned data to a versioned bucket; CI downloads it; optional DVC | S3 versioning, `boto3`, DVC basics | A clean CI machine trains without hitting Open-Meteo |
-| **F5. Deploy on AWS** | ECR image, ECS Fargate service, RDS pgvector, Secrets Manager, ALB; the model is loaded from the registry | ECS/Fargate concepts, VPC basics, RDS, Docker push | `/ask` works on a public URL; a new champion deploys from CI |
+| **F5. Deploy on AWS** | ECR image, ECS Fargate service, RDS pgvector, Secrets Manager, ALB; the model is loaded from the registry | ECS/Fargate concepts, VPC basics, RDS, Docker push | `/ask` works on a public URL with all 4 tools and RAG; an app code change and a new champion both redeploy from CI |
 | **F6. Monitoring and cost** | CloudWatch logs and alarms, a billing alarm, simple data/prediction checks (the skipped M4/M5) | CloudWatch, AWS Budgets | You get an alert if the API fails or costs pass your limit |
 
 Order matters: F1 and F2 need no AWS account. F3 needs the account. Do not build F5 before F3 and F4.
