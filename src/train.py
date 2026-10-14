@@ -24,6 +24,9 @@ METRICS_PATH = BASE_DIR / "reports" / "metrics.json"
 TRACKING_URI = f"sqlite:///{(BASE_DIR / 'mlflow.db').as_posix()}"
 ARTIFACTS_DIR = BASE_DIR / "mlruns"
 EXPERIMENT = "mumbai-temperature-1h"
+# Model Registry: every model the quality gate accepts becomes a new version; the alias points at the live one
+REGISTERED_MODEL = "mumbai-temperature"
+CHAMPION_ALIAS = "champion"
 TRUSTED_MODEL_TYPES = ["sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor"]
 EXPERIMENTS_DIR = BASE_DIR / "experiments"
 DEFAULT_CONFIG = EXPERIMENTS_DIR / "exp_002_iter600.yaml"
@@ -162,6 +165,8 @@ def main() -> None:
 
     if args.no_mlflow:
         logger.info("MLflow tracking skipped (--no-mlflow)")
+        if accepted:
+            logger.warning("The new model was saved but NOT registered: the Model Registry champion is now older than models/")
     else:
         try:
             log_to_mlflow(report, final_model, sample=test[FEATURES].head(5), gate=(accepted, reason), config_path=config_path)
@@ -215,11 +220,30 @@ def log_to_mlflow(report: dict, model, sample: pd.DataFrame, gate: tuple[bool, s
         # MLflow saves the model with skops (a safe format), which only loads object types it was told
         # to trust. We trained this model ourselves, so we trust exactly the one type gradient boosting uses.
         # pip_requirements: the model only needs scikit-learn (saves MLflow ~30 s of guessing it)
-        mlflow.sklearn.log_model(sk_model=model, name="model", input_example=sample,
-                                 skops_trusted_types=TRUSTED_MODEL_TYPES,
-                                 pip_requirements=[f"scikit-learn=={sklearn.__version__}"])
+        # registered_model_name: only an ACCEPTED model goes into the registry (rejected runs keep their model as a run file)
+        model_info = mlflow.sklearn.log_model(sk_model=model, name="model", input_example=sample,
+                                              skops_trusted_types=TRUSTED_MODEL_TYPES,
+                                              pip_requirements=[f"scikit-learn=={sklearn.__version__}"],
+                                              registered_model_name=REGISTERED_MODEL if gate[0] else None)
+        if gate[0]:
+            promote_to_champion(mlflow.MlflowClient(), model_info.registered_model_version, report, run.info.run_id)
     logger.info("MLflow: run %s logged to experiment %r. View all runs (from the project folder): "
                 "mlflow ui --backend-store-uri sqlite:///mlflow.db", run.info.run_id[:8], EXPERIMENT)
+
+
+def promote_to_champion(client, version: str, report: dict, run_id: str) -> None:
+    """Move the 'champion' alias to the new version, so the app (and later CI/AWS) can ask for 'the live model'."""
+    old = None
+    try:
+        old = client.get_model_version_by_alias(REGISTERED_MODEL, CHAMPION_ALIAS).version
+    except Exception:
+        pass  # no champion yet: this is the first accepted model
+    client.set_registered_model_alias(REGISTERED_MODEL, CHAMPION_ALIAS, version)
+    for key, value in {"experiment": report["experiment"], "test_rmse": str(report["test_2024_2025"]["model_rmse"]),
+                       "val_rmse": str(report["validation_2022_2023"]["model_rmse"]), "run_id": run_id}.items():
+        client.set_model_version_tag(REGISTERED_MODEL, version, key, value)
+    logger.info("Model Registry: %s version %s is now %r (was version %s)", REGISTERED_MODEL, version,
+                CHAMPION_ALIAS, old or "none")
 
 
 if __name__ == "__main__":

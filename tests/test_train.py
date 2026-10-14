@@ -91,3 +91,35 @@ def test_gate_accepts_a_model_better_than_or_equal_to_the_current_one(current_mo
     current_model(0.41)
     assert quality_gate(scores(0.40))[0]
     assert quality_gate(scores(0.41))[0]
+
+
+# --- Model Registry (a fake MLflow client: no MLflow needed) -------------------------------------
+
+class FakeRegistry:
+    def __init__(self, champion=None):
+        self.aliases = {"champion": champion} if champion else {}
+        self.tags = {}
+
+    def get_model_version_by_alias(self, name, alias):
+        if alias not in self.aliases:
+            raise LookupError("no such alias")
+        return type("Version", (), {"version": self.aliases[alias]})
+
+    def set_registered_model_alias(self, name, alias, version):
+        self.aliases[alias] = version
+
+    def set_model_version_tag(self, name, version, key, value):
+        self.tags[(version, key)] = value
+
+
+REPORT = {"experiment": "exp_009", "validation_2022_2023": {"model_rmse": 0.39}, "test_2024_2025": {"model_rmse": 0.40}}
+
+
+@pytest.mark.parametrize("old_champion", [None, "1"], ids=["first-model", "replaces-champion"])
+def test_promote_moves_the_champion_alias_and_tags_the_version(old_champion):
+    registry = FakeRegistry(champion=old_champion)
+    train.promote_to_champion(registry, "2", REPORT, run_id="abc123")
+    assert registry.aliases["champion"] == "2"
+    assert registry.tags[("2", "experiment")] == "exp_009"
+    assert registry.tags[("2", "test_rmse")] == "0.4"
+    assert registry.tags[("2", "run_id")] == "abc123"

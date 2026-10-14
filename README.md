@@ -150,6 +150,10 @@ beats the lazy guess and is not worse than the current model on the test set. A 
 (tags `quality_gate` and `quality_gate_reason`) but the saved model stays as it was. Compare runs on `val_rmse`
 and use the test number only for the final check.
 
+**Model Registry:** every accepted model is also registered in MLflow as a new version of `mumbai-temperature`, and
+the alias `champion` moves to it (version tags: experiment, val/test RMSE, run id). Rejected runs are not registered.
+Load the live model by name instead of by file: `mlflow.sklearn.load_model("models:/mumbai-temperature@champion")`.
+
 MLflow is a development tool only: the Docker image and the API do not need it, and `train.py` still works
 when it is not installed.
 
